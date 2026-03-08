@@ -117,6 +117,51 @@ app.get('/queues/:id/stats', async (req, res) => {
   }
 });
 
+// CSAT: submit rating (or skip) after ticket finalization
+app.post('/tickets/:id/csat', async (req, res) => {
+  const { id } = req.params;
+  const { rating, comment, skipped, attendant, serviceId } = req.body;
+
+  const ticket = await store.getTicket(id);
+  if (!ticket) return res.status(404).json({ error: 'ticket not found' });
+
+  if (!skipped) {
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'rating must be an integer between 1 and 5' });
+    }
+  }
+
+  try {
+    const csat = await store.submitCsat(id, { rating, comment, skipped: !!skipped, attendant, serviceId });
+    if (!csat) return res.status(409).json({ error: 'CSAT already submitted for this ticket' });
+    res.status(201).json(csat);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// CSAT stats: avg, distribution, response rate, comments (anonymized) — Scenario 3
+app.get('/csat/stats', async (req, res) => {
+  const { attendant, serviceId, from, to } = req.query;
+  try {
+    const stats = await store.getCsatStats({ attendant, serviceId, from, to });
+    res.json(stats);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// CSAT NPS by service — Scenario 4
+app.get('/csat/nps', async (req, res) => {
+  const { serviceId, from, to } = req.query;
+  try {
+    const nps = await store.getCsatNps({ serviceId, from, to });
+    res.json(nps);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const server = http.createServer(app);
 
 // attach WebSocket server

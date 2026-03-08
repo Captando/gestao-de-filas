@@ -13,6 +13,17 @@ ensureDataDir(DB_FILE);
 
 const db = new Database(DB_FILE);
 
+const OFFENSIVE_WORDS = [
+  'merda', 'idiota', 'imbecil', 'lixo', 'droga', 'maldito', 'otario', 'otário',
+  'burro', 'incompetente', 'vagabundo', 'inútil', 'inutil'
+];
+
+function isFlagged(text) {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return OFFENSIVE_WORDS.some(w => lower.includes(w));
+}
+
 function migrate() {
   db.pragma('journal_mode = WAL');
   db.prepare(`CREATE TABLE IF NOT EXISTS queues (
@@ -36,6 +47,18 @@ function migrate() {
     result TEXT,
     noshowReason TEXT,
     history TEXT
+  )`).run();
+
+  db.prepare(`CREATE TABLE IF NOT EXISTS csat_responses (
+    id TEXT PRIMARY KEY,
+    ticketId TEXT NOT NULL,
+    attendant TEXT,
+    serviceId TEXT,
+    rating INTEGER,
+    comment TEXT,
+    flagged INTEGER DEFAULT 0,
+    skipped INTEGER DEFAULT 0,
+    createdAt TEXT NOT NULL
   )`).run();
 }
 
@@ -69,9 +92,95 @@ function _rowToTicket(row) {
 
 function resetDatabase() {
   // drop tables and re-run migrations — useful for tests
+  db.prepare('DROP TABLE IF EXISTS csat_responses').run();
   db.prepare('DROP TABLE IF EXISTS tickets').run();
   db.prepare('DROP TABLE IF EXISTS queues').run();
   migrate();
+}
+
+function submitCsat(ticketId, { rating, comment, skipped, attendant, serviceId } = {}) {
+  // prevent duplicate CSAT for same ticket
+  const existing = db.prepare('SELECT id FROM csat_responses WHERE ticketId = ?').get(ticketId);
+  if (existing) return null;
+
+  const id = require('uuid').v4();
+  const createdAt = new Date().toISOString();
+  const isSkipped = skipped ? 1 : 0;
+  const safeRating = isSkipped ? null : (rating || null);
+  const safeComment = isSkipped ? null : (comment || null);
+  const flaggedVal = isFlagged(safeComment) ? 1 : 0;
+
+  db.prepare(`INSERT INTO csat_responses(id, ticketId, attendant, serviceId, rating, comment, flagged, skipped, createdAt)
+    VALUES(?,?,?,?,?,?,?,?,?)`).run(
+    id, ticketId, attendant || null, serviceId || null,
+    safeRating, safeComment, flaggedVal, isSkipped, createdAt
+  );
+  return {
+    id, ticketId, attendant: attendant || null, serviceId: serviceId || null,
+    rating: safeRating, comment: safeComment, flagged: flaggedVal === 1,
+    skipped: isSkipped === 1, createdAt
+  };
+}
+
+function getCsatStats({ attendant, serviceId, from, to } = {}) {
+  let sql = 'SELECT cr.id, cr.ticketId, cr.attendant, cr.serviceId, cr.rating, cr.comment, cr.flagged, cr.skipped, cr.createdAt FROM csat_responses cr';
+  const clauses = [];
+  const params = [];
+
+  if (attendant) { clauses.push('cr.attendant = ?'); params.push(attendant); }
+  if (serviceId) { clauses.push('cr.serviceId = ?'); params.push(serviceId); }
+  if (from) { clauses.push('cr.createdAt >= ?'); params.push(from); }
+  if (to) { clauses.push('cr.createdAt <= ?'); params.push(to); }
+
+  if (clauses.length) sql += ' WHERE ' + clauses.join(' AND ');
+
+  const rows = db.prepare(sql).all(...params);
+  const total = rows.length;
+  const answered = rows.filter(r => !r.skipped);
+  const ratings = answered.map(r => r.rating).filter(r => r != null);
+
+  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  ratings.forEach(r => { if (distribution[r] !== undefined) distribution[r]++; });
+
+  const ratingsSum = ratings.reduce((s, x) => s + x, 0);
+  const avgCsat = ratings.length ? Math.round((ratingsSum / ratings.length) * 100) / 100 : null;
+  const responseRate = total > 0 ? Math.round((answered.length / total) * 10000) / 100 : 0;
+
+  // comments are anonymized: no citizen PII, only ticketId for operational cross-referencing
+  const comments = answered
+    .filter(r => r.comment)
+    .map(r => ({ id: r.id, ticketId: r.ticketId, rating: r.rating, comment: r.comment, flagged: r.flagged === 1 }));
+
+  return { total, answered: answered.length, avgCsat, distribution, responseRate, comments };
+}
+
+function getCsatNps({ serviceId, from, to } = {}) {
+  let sql = 'SELECT rating FROM csat_responses WHERE skipped = 0 AND rating IS NOT NULL';
+  const params = [];
+
+  if (serviceId) { sql += ' AND serviceId = ?'; params.push(serviceId); }
+  if (from) { sql += ' AND createdAt >= ?'; params.push(from); }
+  if (to) { sql += ' AND createdAt <= ?'; params.push(to); }
+
+  const rows = db.prepare(sql).all(...params);
+
+  if (rows.length < 10) {
+    return { nps: null, message: 'Dados insuficientes para cálculo de NPS', total: rows.length, required: 10 };
+  }
+
+  const total = rows.length;
+  const promoters = rows.filter(r => r.rating >= 4).length;
+  const detractors = rows.filter(r => r.rating <= 2).length;
+  const nps = Math.round(((promoters / total) - (detractors / total)) * 100);
+
+  return {
+    nps,
+    total,
+    promoters,
+    neutrals: total - promoters - detractors,
+    detractors,
+    message: null
+  };
 }
 
 function ensureQueue(queueId) {
@@ -238,6 +347,9 @@ module.exports = {
   noshowTicket,
   listTickets,
   getQueueStats,
+  submitCsat,
+  getCsatStats,
+  getCsatNps,
   resetDatabase,
   _db: db
 };

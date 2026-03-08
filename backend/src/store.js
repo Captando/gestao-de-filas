@@ -11,6 +11,9 @@ module.exports = {
   noshowTicket: (...args) => client.noshowTicket(...args),
   listTickets: (...args) => client.listTickets(...args),
   getQueueStats: (...args) => client.getQueueStats(...args),
+  submitCsat: (...args) => client.submitCsat(...args),
+  getCsatStats: (...args) => client.getCsatStats(...args),
+  getCsatNps: (...args) => client.getCsatNps(...args),
   // expose reset for tests if needed
   _resetDatabase: (...args) => client.resetDatabase(...args)
 };
