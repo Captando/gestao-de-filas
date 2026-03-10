@@ -3,18 +3,352 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Guichê - Interface (Prototype)</title>
-  <link rel="stylesheet" href="./style.css">
+  <title>Guichê - Interface</title>
+  <style>
+    /* Reset e Variáveis */
+    :root {
+      --primary-color: #0056b3;
+      --primary-hover: #004494;
+      --success: #10b981;
+      --success-hover: #059669;
+      --danger: #e53e3e;
+      --danger-hover: #c53030;
+      --warning: #f59e0b;
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Cabeçalho */
+    .topbar {
+      background: var(--card-bg);
+      color: var(--text-main);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      border-bottom: 1px solid var(--border-color);
+      z-index: 10;
+    }
+
+    .brand {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--primary-color);
+    }
+
+    /* Layout Principal (Dashboard) */
+    .center {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      grid-template-rows: auto 1fr;
+      gap: 1.5rem;
+      padding: 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 1rem;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+      padding: 2rem;
+      border: 1px solid var(--border-color);
+    }
+
+    h2, h3 {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 1.5rem;
+      border-bottom: 2px solid var(--border-color);
+      padding-bottom: 0.5rem;
+    }
+
+    /* Painel do Ticket Atual */
+    .current {
+      grid-column: 1;
+      grid-row: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 350px;
+    }
+
+    .ticketLarge {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+
+    .code {
+      font-size: 6rem;
+      font-weight: 800;
+      color: var(--primary-color);
+      letter-spacing: 2px;
+      line-height: 1;
+      margin-bottom: 2rem;
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    .meta {
+      font-size: 1.25rem;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+      background: var(--bg-color);
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .meta span {
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    /* Barra Lateral (Fila + Histórico) */
+    .sidebar {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      overflow-y: auto;
+    }
+
+    .sidebar-section {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-section div.stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 0;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 1.1rem;
+      color: var(--text-muted);
+    }
+
+    .sidebar-section div.stat-row:last-child { border-bottom: none; }
+
+    .sidebar-section span {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--primary-color);
+    }
+
+    /* Histórico */
+    .history-list {
+      list-style: none;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .history-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.95rem;
+      color: var(--text-muted);
+    }
+
+    .history-list li:last-child { border-bottom: none; }
+    .history-list li:hover { background: var(--bg-color); border-radius: 0.25rem; cursor: pointer; }
+
+    .history-number {
+      font-weight: 700;
+      color: var(--text-main);
+      font-family: 'Courier New', monospace;
+    }
+
+    .history-status {
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .history-status.finalized { background: #dcfce7; color: #166534; }
+    .history-status.noshow { background: #fee2e2; color: #991b1b; }
+    .history-status.transferred { background: #fef3c7; color: #92400e; }
+
+    .history-empty {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      padding: 1rem 0;
+      text-align: center;
+    }
+
+    /* Área de Ações (Botões) */
+    .actions {
+      grid-column: 1;
+      grid-row: 2;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+      justify-content: flex-start;
+      background: transparent;
+      box-shadow: none;
+      border: none;
+      padding: 0;
+    }
+
+    button {
+      outline: none;
+      cursor: pointer;
+      font-weight: 600;
+      border-radius: 0.5rem;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+    }
+
+    button:active { transform: translateY(2px); }
+
+    .primary.large {
+      background: var(--primary-color);
+      color: white;
+      padding: 1.25rem 2rem;
+      font-size: 1.25rem;
+      flex: 1;
+      min-width: 250px;
+      box-shadow: 0 4px 12px rgba(0, 86, 179, 0.2);
+    }
+    .primary.large:hover { background: var(--primary-hover); }
+
+    .primary {
+      background: var(--success);
+      color: white;
+      padding: 1.25rem 2rem;
+      font-size: 1.1rem;
+      flex: 1;
+      min-width: 250px;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+    }
+    .primary:hover { background: var(--success-hover); }
+
+    .danger {
+      background: white;
+      color: var(--danger);
+      border: 2px solid var(--danger);
+      padding: 1rem 1.5rem;
+      font-size: 1rem;
+    }
+    .danger:hover { background: #fff5f5; }
+
+    .small {
+      background: white;
+      color: var(--text-main);
+      border: 2px solid var(--border-color);
+      padding: 1rem 1.5rem;
+      font-size: 1rem;
+    }
+    .small:hover { background: var(--bg-color); border-color: var(--text-muted); }
+
+    /* Estilo do Toast */
+    .toast {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      padding: 1rem 1.5rem;
+      border-radius: 0.5rem;
+      color: white;
+      font-weight: bold;
+      font-size: 1rem;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+      z-index: 9999;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.error { background: var(--danger); }
+    .toast.success { background: var(--success); }
+    .toast.warning { background: var(--warning); color: #fff; }
+    .toast.info { background: var(--primary-color); }
+
+    /* Modal de Transferência */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--card-bg);
+      border-radius: 1rem;
+      padding: 2rem;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .modal h3 { font-size: 1.2rem; margin-bottom: 1rem; border: none; padding: 0; }
+    .modal select {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      font-size: 1.1rem;
+      border: 2px solid var(--border-color);
+      border-radius: 0.5rem;
+      margin-bottom: 1.5rem;
+      background: white;
+    }
+    .modal .row {
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-end;
+    }
+
+  </style>
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">Guichê 3 — Protótipo</div>
-    <div class="status">Status: <span id="status">Pronto</span></div>
+    <div class="brand">Guichê 3 — Painel de Controle</div>
   </header>
 
   <main class="center">
+    <!-- Visualização do Ticket -->
     <section class="card current">
-      <h2>Ticket Atual</h2>
+      <h2>Ticket em Atendimento</h2>
       <div class="ticketLarge">
         <div class="code" id="code">—</div>
         <div class="meta">Serviço: <span id="svc">—</span></div>
@@ -23,21 +357,49 @@
       </div>
     </section>
 
-    <aside class="actions card">
+    <!-- Barra lateral -->
+    <section class="card sidebar" id="sidebar">
+      <div class="sidebar-section">
+        <h3>Visão da Fila</h3>
+        <div class="stat-row">Aguardando: <span id="total">0</span></div>
+        <div class="stat-row">Prioritários: <span id="prioCount">0</span></div>
+        <div class="stat-row">Tempo Estimado: <span id="est">~N/A</span></div>
+      </div>
+      <div class="sidebar-section">
+        <h3>Histórico</h3>
+        <ul class="history-list" id="historyList">
+          <li class="history-empty">Nenhum atendimento ainda</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Ações -->
+    <aside class="actions">
       <button id="callBtn" class="primary large">Chamar Próximo (F2)</button>
-      <button id="recallBtn" class="small">Reconvocar</button>
       <button id="finalizeBtn" class="primary">Finalizar Atendimento (F3)</button>
+      <button id="recallBtn" class="small">Reconvocar</button>
       <button id="noshowBtn" class="danger">Não Compareceu</button>
       <button id="transferBtn" class="small">Transferir</button>
     </aside>
-
-    <section class="card sidebar" id="sidebar">
-      <h3>Visão da Fila</h3>
-      <div>Totais: <span id="total">0</span></div>
-      <div>Prioritários: <span id="prioCount">0</span></div>
-      <div>Estimativa: <span id="est">~N/A</span></div>
-    </section>
   </main>
+
+  <!-- Modal de Transferência -->
+  <div class="modal-overlay" id="transferModal">
+    <div class="modal">
+      <h3>Transferir Ticket</h3>
+      <select id="transferDest">
+        <option value="">Selecione a fila destino...</option>
+        <option value="Cobrança">Cobrança</option>
+        <option value="Documentos">Documentos</option>
+        <option value="Atendimento Geral">Atendimento Geral</option>
+        <option value="Suporte Técnico">Suporte Técnico</option>
+      </select>
+      <div class="row">
+        <button id="transferCancel" class="small">Cancelar</button>
+        <button id="transferConfirm" class="primary" style="min-width:auto;flex:none;padding:0.75rem 1.5rem;">Confirmar</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     const API_BASE = 'http://localhost:3000';
@@ -57,6 +419,82 @@
     }
     initWS();
 
+    // Utilitário para Notificações Elegantes (Substitui o alert)
+    function showToast(msg, type = 'info') {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.innerText = msg;
+      document.body.appendChild(toast);
+      
+      // Trigger animation
+      setTimeout(() => toast.classList.add('show'), 10);
+      
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    const historyList = document.getElementById('historyList');
+    const historyItems = [];
+
+    function addToHistory(ticket, status) {
+      const number = ticket.number || ticket.id;
+      const service = ticket.meta && ticket.meta.service ? ticket.meta.service : '—';
+      const time = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+      const statusLabels = { finalized: 'Finalizado', noshow: 'Não veio', transferred: 'Transferido' };
+      historyItems.unshift({ number, service, status, time, ticket });
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const statusLabels = { finalized: 'Finalizado', noshow: 'Não veio', transferred: 'Transferido' };
+      historyList.innerHTML = '';
+      historyItems.forEach((item, idx) => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span class="history-number">${String(item.number).padStart(4, '0')}</span>
+          <span>${item.service}</span>
+          <span>${item.time}</span>
+          <span class="history-status ${item.status}">${statusLabels[item.status] || item.status}</span>
+        `;
+        li.style.cursor = 'pointer';
+        li.title = 'Clique para rechamar esta senha';
+        li.onclick = () => recallFromHistory(idx);
+        historyList.appendChild(li);
+      });
+    }
+
+    async function recallFromHistory(idx) {
+      if (currentTicket) {
+        showToast('Finalize ou libere o ticket atual antes de rechamar', 'warning');
+        return;
+      }
+      const item = historyItems[idx];
+      try {
+        const resp = await fetch(`${API_BASE}/tickets/${item.ticket.id}/call`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ guiche: '3' })
+        });
+        if (!resp.ok) throw new Error('Falha ao rechamar ticket');
+        const t = await resp.json();
+        currentTicket = t;
+        codeEl.textContent = t.number || t.id;
+        svcEl.textContent = t.meta && t.meta.service ? t.meta.service : '—';
+        prioEl.textContent = 'Normal';
+        startTimeCounter();
+
+        historyItems.splice(idx, 1);
+        renderHistory();
+        showToast('Senha ' + (t.number || t.id) + ' rechamada', 'info');
+        fetchStats();
+      } catch(e) {
+        showToast('Erro ao rechamar: ' + e.message, 'error');
+      }
+    }
+
     const callBtn = document.getElementById('callBtn');
     const finalizeBtn = document.getElementById('finalizeBtn');
     const recallBtn = document.getElementById('recallBtn');
@@ -70,6 +508,23 @@
     const prioCountEl = document.getElementById('prioCount');
     const estEl = document.getElementById('est');
     let currentTicket = null;
+    let timeTimer = null;
+
+    function startTimeCounter() {
+      stopTimeCounter();
+      timeTimer = setInterval(() => {
+        if (!currentTicket || !currentTicket.createdAt) return;
+        const diff = Math.floor((Date.now() - new Date(currentTicket.createdAt).getTime()) / 1000);
+        const min = Math.floor(diff / 60);
+        const sec = diff % 60;
+        timeEl.textContent = min > 0 ? `${min}m ${String(sec).padStart(2,'0')}s` : `${sec}s`;
+      }, 1000);
+    }
+
+    function stopTimeCounter() {
+      if (timeTimer) { clearInterval(timeTimer); timeTimer = null; }
+      timeEl.textContent = '—';
+    }
 
     async function fetchStats(){
       try{
@@ -87,42 +542,118 @@
         const listResp = await fetch(`${API_BASE}/tickets?queueId=default&status=waiting`);
         if(!listResp.ok) throw new Error('Falha ao buscar fila');
         const list = await listResp.json();
-        if(!list.length){ alert('Nenhum ticket aguardando'); return; }
+        
+        if(!list.length){ 
+          showToast('Nenhum ticket aguardando na fila', 'warning'); 
+          return; 
+        }
+        
         const next = list[0];
         const callResp = await fetch(`${API_BASE}/tickets/${next.id}/call`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ guiche: '3' }) });
         if(!callResp.ok) throw new Error('Falha ao chamar ticket');
+        
         const t = await callResp.json();
         currentTicket = t;
         codeEl.textContent = t.number || t.id;
         svcEl.textContent = t.meta && t.meta.service ? t.meta.service : '—';
         prioEl.textContent = 'Normal';
-        timeEl.textContent = '—';
-        document.getElementById('status').textContent = 'Em Atendimento';
+        startTimeCounter();
         fetchStats();
-      }catch(e){ alert('Erro: ' + e.message); }
+      }catch(e){ 
+        showToast('Erro: ' + e.message, 'error'); 
+      }
     }
 
     finalizeBtn.onclick = async () => {
-      if(!currentTicket){ alert('Nenhum ticket em atendimento'); return; }
+      if(!currentTicket){ 
+        showToast('Nenhum ticket em atendimento no momento', 'warning'); 
+        return; 
+      }
       try{
         const r = await fetch(`${API_BASE}/tickets/${currentTicket.id}/finalize`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ result: { outcome: 'ok' } }) });
         if(!r.ok) throw new Error('Falha ao finalizar');
-        alert('Atendimento finalizado: ' + currentTicket.id);
+        
+        showToast('Atendimento finalizado: ' + (currentTicket.number || currentTicket.id), 'success');
+        addToHistory(currentTicket, 'finalized');
+
         currentTicket = null;
-        codeEl.textContent = '—'; svcEl.textContent='—'; prioEl.textContent='Normal'; timeEl.textContent='—';
-        document.getElementById('status').textContent = 'Pronto';
+        codeEl.textContent = '—';
+        svcEl.textContent='—';
+        prioEl.textContent='Normal';
+        stopTimeCounter();
         fetchStats();
-      }catch(e){ alert('Erro: ' + e.message); }
+      }catch(e){ 
+        showToast('Erro: ' + e.message, 'error'); 
+      }
     }
 
-    recallBtn.onclick = () => { if(!currentTicket){ alert('Nenhum ticket para reconvocar'); return; } alert('Reconvocando: ' + currentTicket.id); }
-    noshowBtn.onclick = () => { if(!currentTicket){ alert('Nenhum ticket ativo'); return; } alert('Registrado não comparecimento para ' + currentTicket.id); currentTicket = null; document.getElementById('status').textContent = 'Pronto'; }
-    transferBtn.onclick = () => { if(!currentTicket){ alert('Nenhum ticket para transferir'); return; } const dest = prompt('Fila destino (ex: Documentos)'); if(dest){ alert('Ticket ' + currentTicket.id + ' transferido para ' + dest); currentTicket = null; document.getElementById('status').textContent = 'Pronto'; } }
+    recallBtn.onclick = () => { 
+      if(!currentTicket){ 
+        showToast('Nenhum ticket para reconvocar', 'warning'); 
+        return; 
+      } 
+      showToast('Reconvocando painel: ' + (currentTicket.number || currentTicket.id), 'info'); 
+    }
+    
+    noshowBtn.onclick = () => { 
+      if(!currentTicket){ 
+        showToast('Nenhum ticket ativo', 'warning'); 
+        return; 
+      } 
+      showToast('Registrado não comparecimento para ' + (currentTicket.number || currentTicket.id), 'error');
+      addToHistory(currentTicket, 'noshow');
+      currentTicket = null;
+      codeEl.textContent = '—'; svcEl.textContent='—'; prioEl.textContent='Normal';
+      stopTimeCounter(); 
+    }
+    
+    const transferModal = document.getElementById('transferModal');
+    const transferDest = document.getElementById('transferDest');
+    const transferCancel = document.getElementById('transferCancel');
+    const transferConfirm = document.getElementById('transferConfirm');
+
+    transferBtn.onclick = () => {
+      if(!currentTicket){
+        showToast('Nenhum ticket para transferir', 'warning');
+        return;
+      }
+      transferDest.value = '';
+      transferModal.classList.add('open');
+    }
+
+    transferCancel.onclick = () => {
+      transferModal.classList.remove('open');
+    }
+
+    transferModal.onclick = (e) => {
+      if(e.target === transferModal) transferModal.classList.remove('open');
+    }
+
+    transferConfirm.onclick = () => {
+      const dest = transferDest.value;
+      if(!dest){
+        showToast('Selecione uma fila destino', 'warning');
+        return;
+      }
+      transferModal.classList.remove('open');
+      showToast('Ticket ' + (currentTicket.number || currentTicket.id) + ' transferido para ' + dest, 'success');
+      addToHistory(currentTicket, 'transferred');
+      currentTicket = null;
+      codeEl.textContent = '—'; svcEl.textContent='—'; prioEl.textContent='Normal';
+      stopTimeCounter();
+      fetchStats();
+    }
 
     // keyboard shortcuts
     document.addEventListener('keydown', e => {
-      if(e.key === 'F2') callBtn.click();
-      if(e.key === 'F3') finalizeBtn.click();
+      if(e.key === 'F2') {
+        e.preventDefault();
+        callBtn.click();
+      }
+      if(e.key === 'F3') {
+        e.preventDefault();
+        finalizeBtn.click();
+      }
     });
   </script>
 </body>

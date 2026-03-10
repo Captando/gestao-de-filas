@@ -10,6 +10,21 @@ async function initSchema() {
     lastNumber INTEGER DEFAULT 0
   )`);
 
+  await pool.query(`CREATE TABLE IF NOT EXISTS csat_responses (
+    id TEXT PRIMARY KEY,
+    ticketId TEXT NOT NULL UNIQUE,
+    attendant TEXT,
+    serviceId TEXT,
+    rating INTEGER CHECK (rating BETWEEN 1 AND 5),
+    comment TEXT,
+    flagged BOOLEAN NOT NULL DEFAULT FALSE,
+    skipped BOOLEAN NOT NULL DEFAULT FALSE,
+    createdAt TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_csat_attendant ON csat_responses(attendant)');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_csat_service ON csat_responses(serviceId)');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_csat_created ON csat_responses(createdAt)');
+
   await pool.query(`CREATE TABLE IF NOT EXISTS tickets (
     id TEXT PRIMARY KEY,
     queueId TEXT,
@@ -78,7 +93,7 @@ async function createTicket(queueId, meta = {}) {
   const createdAt = new Date().toISOString();
   const history = [{ when: createdAt, action: 'created' }];
   await pool.query(`INSERT INTO tickets(id, queueId, number, meta, status, createdAt, history)
-    VALUES($1,$2,$3,$4,$5,$6,$7)`, [id, queueId, number, meta, 'waiting', createdAt, history]);
+    VALUES($1,$2,$3,$4,$5,$6,$7)`, [id, queueId, number, JSON.stringify(meta), 'waiting', createdAt, JSON.stringify(history)]);
   return getTicket(id);
 }
 
@@ -95,7 +110,7 @@ async function updateTicket(id, patch) {
   await pool.query(`UPDATE tickets SET queueId=$1, number=$2, meta=$3, status=$4, createdAt=$5, calledAt=$6, attendedAt=$7, finalizedAt=$8, noshowAt=$9, guiche=$10, attendant=$11, result=$12, noshowReason=$13, history=$14 WHERE id=$15`, [
     merged.queueId,
     merged.number,
-    merged.meta || {},
+    JSON.stringify(merged.meta || {}),
     merged.status,
     merged.createdAt,
     merged.calledAt || null,
@@ -104,9 +119,9 @@ async function updateTicket(id, patch) {
     merged.noshowAt || null,
     merged.guiche || null,
     merged.attendant || null,
-    merged.result || null,
+    JSON.stringify(merged.result || null),
     merged.noshowReason || null,
-    history,
+    JSON.stringify(history),
     id
   ]);
   return getTicket(id);
@@ -210,6 +225,89 @@ async function getQueueStats(queueId) {
   };
 }
 
+const OFFENSIVE_WORDS = [
+  'merda', 'idiota', 'imbecil', 'lixo', 'droga', 'maldito', 'otario', 'otário',
+  'burro', 'incompetente', 'vagabundo', 'inútil', 'inutil'
+];
+
+function isFlagged(text) {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return OFFENSIVE_WORDS.some(w => lower.includes(w));
+}
+
+async function submitCsat(ticketId, { rating, comment, skipped, attendant, serviceId } = {}) {
+  const existing = await pool.query('SELECT id FROM csat_responses WHERE ticketId = $1', [ticketId]);
+  if (existing.rows.length) return null;
+
+  const id = uuidv4();
+  const createdAt = new Date().toISOString();
+  const isSkipped = !!skipped;
+  const safeRating = isSkipped ? null : (rating || null);
+  const safeComment = isSkipped ? null : (comment || null);
+  const flaggedVal = isFlagged(safeComment);
+
+  await pool.query(
+    `INSERT INTO csat_responses(id, ticketId, attendant, serviceId, rating, comment, flagged, skipped, createdAt)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    [id, ticketId, attendant || null, serviceId || null, safeRating, safeComment, flaggedVal, isSkipped, createdAt]
+  );
+  return { id, ticketId, attendant: attendant || null, serviceId: serviceId || null, rating: safeRating, comment: safeComment, flagged: flaggedVal, skipped: isSkipped, createdAt };
+}
+
+async function getCsatStats({ attendant, serviceId, from, to } = {}) {
+  let sql = 'SELECT id, ticketId, attendant, serviceId, rating, comment, flagged, skipped, createdAt FROM csat_responses';
+  const clauses = [];
+  const params = [];
+
+  if (attendant) { params.push(attendant); clauses.push(`attendant = $${params.length}`); }
+  if (serviceId) { params.push(serviceId); clauses.push(`serviceId = $${params.length}`); }
+  if (from) { params.push(from); clauses.push(`createdAt >= $${params.length}`); }
+  if (to) { params.push(to); clauses.push(`createdAt <= $${params.length}`); }
+
+  if (clauses.length) sql += ' WHERE ' + clauses.join(' AND ');
+
+  const { rows } = await pool.query(sql, params);
+  const total = rows.length;
+  const answered = rows.filter(r => !r.skipped);
+  const ratings = answered.map(r => r.rating).filter(r => r != null);
+
+  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  ratings.forEach(r => { if (distribution[r] !== undefined) distribution[r]++; });
+
+  const ratingsSum = ratings.reduce((s, x) => s + x, 0);
+  const avgCsat = ratings.length ? Math.round((ratingsSum / ratings.length) * 100) / 100 : null;
+  const responseRate = total > 0 ? Math.round((answered.length / total) * 10000) / 100 : 0;
+
+  const comments = answered
+    .filter(r => r.comment)
+    .map(r => ({ id: r.id, ticketId: r.ticketid || r.ticketId, rating: r.rating, comment: r.comment, flagged: !!r.flagged }));
+
+  return { total, answered: answered.length, avgCsat, distribution, responseRate, comments };
+}
+
+async function getCsatNps({ serviceId, from, to } = {}) {
+  let sql = 'SELECT rating FROM csat_responses WHERE skipped = false AND rating IS NOT NULL';
+  const params = [];
+
+  if (serviceId) { params.push(serviceId); sql += ` AND serviceId = $${params.length}`; }
+  if (from) { params.push(from); sql += ` AND createdAt >= $${params.length}`; }
+  if (to) { params.push(to); sql += ` AND createdAt <= $${params.length}`; }
+
+  const { rows } = await pool.query(sql, params);
+
+  if (rows.length < 10) {
+    return { nps: null, message: 'Dados insuficientes para cálculo de NPS', total: rows.length, required: 10 };
+  }
+
+  const total = rows.length;
+  const promoters = rows.filter(r => r.rating >= 4).length;
+  const detractors = rows.filter(r => r.rating <= 2).length;
+  const nps = Math.round(((promoters / total) - (detractors / total)) * 100);
+
+  return { nps, total, promoters, neutrals: total - promoters - detractors, detractors, message: null };
+}
+
 module.exports = {
   initSchema,
   createTicket,
@@ -221,6 +319,9 @@ module.exports = {
   noshowTicket,
   listTickets,
   getQueueStats,
+  submitCsat,
+  getCsatStats,
+  getCsatNps,
   resetDatabase,
   _pool: pool
 };

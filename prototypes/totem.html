@@ -3,53 +3,331 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Totem - Emissão de Senha (Prototype)</title>
-  <link rel="stylesheet" href="./style.css">
+  <title>Totem - Emissão de Senha</title>
+  <style>
+    /* Reset e Variáveis */
+    :root {
+      --primary-color: #0056b3;
+      --primary-hover: #004494;
+      --primary-active: #003370;
+      --bg-color: #f4f7f6;
+      --text-main: #2d3748;
+      --text-muted: #718096;
+      --card-bg: #ffffff;
+      --danger: #e53e3e;
+      --ticket-bg: #fffcf0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      user-select: none; /* Previne seleção de texto no touch */
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Animações */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-50px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Cabeçalho */
+    .topbar {
+      background: var(--primary-color);
+      color: white;
+      padding: 1.5rem 2.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      z-index: 10;
+    }
+
+    .brand {
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    /* Container Principal */
+    .center {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem;
+      position: relative;
+    }
+
+    /* Seções (Cartões) */
+    section {
+      background: var(--card-bg);
+      padding: 3.5rem;
+      border-radius: 1.5rem;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+      width: 100%;
+      max-width: 850px;
+      text-align: center;
+      animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    section.hidden {
+      display: none !important;
+    }
+
+    h1 {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      color: var(--primary-color);
+    }
+
+    h2 {
+      font-size: 2.2rem;
+      margin-bottom: 1.5rem;
+      color: var(--text-main);
+    }
+
+    p {
+      font-size: 1.3rem;
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+    }
+
+    /* Botões Gerais */
+    button {
+      outline: none;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      touch-action: manipulation; /* Otimiza para toque */
+    }
+
+    /* Botão Primário Grande (Ex: Iniciar) */
+    .primary {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 1.5rem 3rem;
+      font-size: 1.5rem;
+      border-radius: 1rem;
+      box-shadow: 0 8px 0 var(--primary-active), 0 15px 20px rgba(0,0,0,0.2);
+    }
+
+    .primary:active {
+      transform: translateY(8px);
+      box-shadow: 0 0px 0 var(--primary-active), 0 5px 10px rgba(0,0,0,0.2);
+    }
+
+    .primary.large {
+      font-size: 2rem;
+      padding: 2rem 4rem;
+      margin-top: 2rem;
+    }
+
+    /* Botão Secundário / Pequeno */
+    .small {
+      background: transparent;
+      color: var(--primary-color);
+      border: 2px solid var(--primary-color);
+      padding: 1rem 2rem;
+      font-size: 1.2rem;
+      border-radius: 0.75rem;
+      box-shadow: 0 4px 0 rgba(0, 86, 179, 0.2);
+    }
+
+    .small:active {
+      transform: translateY(4px);
+      box-shadow: 0 0px 0 rgba(0, 86, 179, 0.2);
+    }
+
+    /* Grade de Categorias */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .cat {
+      background: #f8fafc;
+      color: var(--text-main);
+      border: 2px solid #e2e8f0;
+      padding: 2.5rem 1rem;
+      font-size: 1.6rem;
+      border-radius: 1rem;
+      box-shadow: 0 6px 0 #cbd5e1;
+    }
+
+    .cat:active {
+      background: var(--primary-color);
+      color: white;
+      border-color: var(--primary-color);
+      box-shadow: 0 0px 0 var(--primary-active);
+      transform: translateY(6px);
+    }
+
+    /* Linha de botões */
+    .row {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      margin-top: 2.5rem;
+      flex-wrap: wrap;
+    }
+
+    /* Estilo do Ticket */
+    .ticket {
+      background: var(--ticket-bg);
+      border: 3px dashed #cbd5e1;
+      border-radius: 1rem;
+      padding: 3rem 2rem;
+      margin: 2rem auto;
+      max-width: 450px;
+      position: relative;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    }
+
+    .ticket::before, .ticket::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 30px;
+      height: 30px;
+      background: var(--card-bg);
+      border-radius: 50%;
+      transform: translateY(-50%);
+    }
+
+    .ticket::before { left: -15px; border-right: 3px dashed #cbd5e1; }
+    .ticket::after { right: -15px; border-left: 3px dashed #cbd5e1; }
+
+    .code {
+      font-size: 5rem;
+      font-weight: 800;
+      color: var(--primary-color);
+      font-family: 'Courier New', Courier, monospace;
+      letter-spacing: 4px;
+      margin-bottom: 1.5rem;
+      line-height: 1;
+    }
+
+    .meta {
+      font-size: 1.4rem;
+      color: var(--text-main);
+      margin: 0.5rem 0;
+      font-weight: 500;
+    }
+
+    .meta span {
+      font-weight: 700;
+      color: var(--primary-active);
+    }
+
+    /* Toast de Erro Personalizado (Substitui o Alert) */
+    .error-toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--danger);
+      color: white;
+      padding: 1rem 2rem;
+      border-radius: 0.5rem;
+      font-size: 1.2rem;
+      font-weight: bold;
+      box-shadow: 0 4px 12px rgba(229, 62, 62, 0.4);
+      z-index: 9999;
+      animation: slideDown 0.3s ease-out forwards;
+    }
+
+    /* Status e Resumos */
+    #serviceSummary { font-size: 1.8rem; color: var(--text-main); margin-bottom: 0.5rem; }
+    #serviceSummary strong { color: var(--primary-color); }
+
+    /* ===== Impressão ===== */
+    @media print {
+      /* Esconde tudo menos o ticket */
+      body { background: white; height: auto; overflow: visible; }
+      .topbar, .error-toast { display: none !important; }
+      .center { padding: 0; display: block; }
+
+      section { display: none !important; }
+      section#ticket { display: block !important; animation: none; box-shadow: none; padding: 0; border-radius: 0; max-width: 100%; }
+      section#ticket h2 { font-size: 1.4rem; margin-bottom: 0.5rem; }
+      section#ticket > p { font-size: 1rem; margin-bottom: 1rem; }
+      section#ticket .row { display: none !important; }
+
+      .ticket { border: 2px dashed #333; box-shadow: none; margin: 0 auto; padding: 1.5rem 1rem; max-width: 300px; }
+      .ticket::before, .ticket::after { display: none; }
+      .code { font-size: 3rem; color: #000; }
+      .meta { font-size: 1rem; color: #000; }
+      .meta span { color: #000; }
+    }
+  </style>
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">Gestão de Filas — Totem (Protótipo)</div>
-    <button id="a11yBtn" class="small">Acessibilidade</button>
+    <div class="brand">Gestão de Filas — Totem</div>
   </header>
 
   <main class="center">
+    <!-- Tela Inicial -->
     <section id="start" class="card big">
-      <h1>Emitir Senha</h1>
-      <p>Toque para iniciar o fluxo de emissão de senha.</p>
+      <h1>Bem-vindo</h1>
+      <p>Toque no botão abaixo para iniciar o fluxo de emissão de senha.</p>
       <button id="startBtn" class="primary large">Emitir Senha</button>
     </section>
 
+    <!-- Tela de Categorias -->
     <section id="categories" class="hidden">
-      <h2>Selecione o Serviço</h2>
+      <h2>Selecione o Serviço Desejado</h2>
       <div class="grid">
         <button class="cat">Cobrança</button>
         <button class="cat">Documentos</button>
         <button class="cat">Atendimento Geral</button>
         <button class="cat">Suporte Técnico</button>
       </div>
-      <button id="backFromCat" class="small">Voltar</button>
+      <button id="backFromCat" class="small">Voltar ao Início</button>
     </section>
 
+    <!-- Tela de Confirmação -->
     <section id="confirm" class="hidden card">
       <h2>Confirmar Serviço</h2>
-      <p id="serviceSummary">Serviço: <strong id="svcName">—</strong></p>
-      <p>Estimativa: <strong id="est">~35 min</strong></p>
+      <p id="serviceSummary">Serviço selecionado: <strong id="svcName">—</strong></p>
+      <p>Tempo de espera estimado: <strong id="est">~35 min</strong></p>
       <div class="row">
-        <button id="confirmBtn" class="primary">Confirmar</button>
         <button id="correctBtn" class="small">Corrigir</button>
+        <button id="confirmBtn" class="primary">Confirmar e Imprimir</button>
       </div>
     </section>
 
+    <!-- Tela do Ticket -->
     <section id="ticket" class="hidden card receipt">
-      <h2>Senha Emitida</h2>
+      <h2>Senha Emitida com Sucesso!</h2>
+      <p>Aguarde ser chamado no painel.</p>
       <div class="ticket">
-        <div class="code" id="ticketCode">00123</div>
-        <div class="meta">Serviço: <span id="ticketSvc">Cobrança</span></div>
-        <div class="meta">Posição: <span id="ticketPos">12</span></div>
-        <div class="meta">Estimativa: <span id="ticketEst">~35 min</span></div>
+        <div class="code" id="ticketCode">0000</div>
+        <div class="meta">Serviço: <span id="ticketSvc">—</span></div>
+        <div class="meta">Pessoas na fila: <span id="ticketPos">0</span></div>
+        <div class="meta">Espera estimada: <span id="ticketEst">—</span></div>
       </div>
       <div class="row">
-        <button id="followBtn" class="small">Quero acompanhar por celular</button>
+        <button id="printBtn" class="small">Reimprimir</button>
         <button id="doneBtn" class="primary">Concluir</button>
       </div>
     </section>
@@ -82,7 +360,7 @@
     const svcName = document.getElementById('svcName');
     const confirmBtn = document.getElementById('confirmBtn');
     const correctBtn = document.getElementById('correctBtn');
-    const ticket = document.getElementById('ticket');
+    const ticketSection = document.getElementById('ticket');
     const ticketCode = document.getElementById('ticketCode');
     const ticketSvc = document.getElementById('ticketSvc');
     const ticketPos = document.getElementById('ticketPos');
@@ -92,6 +370,19 @@
 
     function show(el){ el.classList.remove('hidden'); }
     function hide(el){ el.classList.add('hidden'); }
+
+    // Função para mostrar erros sem usar o alert() nativo
+    function showErrorToast(message) {
+      const toast = document.createElement('div');
+      toast.className = 'error-toast';
+      toast.innerText = message;
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
 
     startBtn.onclick = () => { hide(start); show(categories); };
     backFromCat.onclick = () => { hide(categories); show(start); };
@@ -115,20 +406,29 @@
         const code = String(ticket.number || ticket.id).padStart(4, '0');
         ticketCode.textContent = code;
         ticketSvc.textContent = selected;
+        
         // fetch queue stats for a rough position/estimate
         try{
           const s = await fetch(`${API_BASE}/queues/default/stats`);
-          if(s.ok){ const stats = await s.json(); ticketPos.textContent = stats.waiting || 0; ticketEst.textContent = stats.tme_seconds? '~' + Math.round(stats.tme_seconds/60) + ' min' : '~N/A'; }
+          if(s.ok){ 
+            const stats = await s.json(); 
+            ticketPos.textContent = stats.waiting || 0; 
+            ticketEst.textContent = stats.tme_seconds? '~' + Math.round(stats.tme_seconds/60) + ' min' : '~N/A'; 
+          }
         }catch(e){}
+        
         hide(confirm);
-        show(ticket);
+        show(ticketSection);
+        // Imprime o ticket automaticamente
+        setTimeout(() => window.print(), 400);
       }catch(e){
-        alert('Erro: ' + e.message);
+        showErrorToast('Erro: ' + e.message);
       }
     }
 
     correctBtn.onclick = () => { hide(confirm); show(categories); }
-    doneBtn.onclick = () => { hide(ticket); show(start); }
+    document.getElementById('printBtn').onclick = () => window.print();
+    doneBtn.onclick = () => { hide(ticketSection); show(start); }
 
   </script>
 </body>
