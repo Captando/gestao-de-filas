@@ -290,18 +290,30 @@
     <section id="categories" class="hidden">
       <h2>Selecione o Serviço Desejado</h2>
       <div class="grid">
-        <button class="cat">Cobrança</button>
-        <button class="cat">Documentos</button>
-        <button class="cat">Atendimento Geral</button>
-        <button class="cat">Suporte Técnico</button>
+        <button class="cat" data-queue="cobranca">Cobrança</button>
+        <button class="cat" data-queue="documentos">Documentos</button>
+        <button class="cat" data-queue="atendimento-geral">Atendimento Geral</button>
+        <button class="cat" data-queue="suporte-tecnico">Suporte Técnico</button>
       </div>
       <button id="backFromCat" class="small">Voltar ao Início</button>
+    </section>
+
+    <!-- Tela de Prioridade -->
+    <section id="priority" class="hidden">
+      <h2>Tipo de Atendimento</h2>
+      <p>Selecione o tipo de atendimento desejado.</p>
+      <div class="grid">
+        <button id="prioNormal" class="cat">Normal</button>
+        <button id="prioPriority" class="cat" style="border-color:#f59e0b;color:#92400e;background:#fffbeb;">Prioritario<br><small style="font-size:0.9rem;font-weight:400;">(Idoso, PCD, Gestante)</small></button>
+      </div>
+      <button id="backFromPrio" class="small">Voltar</button>
     </section>
 
     <!-- Tela de Confirmação -->
     <section id="confirm" class="hidden card">
       <h2>Confirmar Serviço</h2>
       <p id="serviceSummary">Serviço selecionado: <strong id="svcName">—</strong></p>
+      <p id="prioSummary">Atendimento: <strong id="prioLabel">Normal</strong></p>
       <p>Tempo de espera estimado: <strong id="est">~35 min</strong></p>
       <div class="row">
         <button id="correctBtn" class="small">Corrigir</button>
@@ -541,7 +553,11 @@
     const ticketPos = document.getElementById('ticketPos');
     const ticketEst = document.getElementById('ticketEst');
     const doneBtn = document.getElementById('doneBtn');
+    const prioritySection = document.getElementById('priority');
+    const prioLabel = document.getElementById('prioLabel');
     let selected = null;
+    let selectedQueue = null;
+    let isPriority = false;
 
     function show(el){ el.classList.remove('hidden'); }
     function hide(el){ el.classList.add('hidden'); }
@@ -564,18 +580,38 @@
     startBtn.onclick = () => { hide(start); show(categories); };
     backFromCat.onclick = () => { hide(categories); show(start); };
 
-    document.querySelectorAll('.cat').forEach(b => {
+    // Selecao de servico -> tela de prioridade
+    document.querySelectorAll('.cat[data-queue]').forEach(b => {
       b.onclick = () => {
         selected = b.textContent.trim();
+        selectedQueue = b.dataset.queue;
         svcName.textContent = selected;
         hide(categories);
-        show(confirm);
+        show(prioritySection);
       }
     });
 
+    // Prioridade
+    document.getElementById('backFromPrio').onclick = () => { hide(prioritySection); show(categories); };
+    document.getElementById('prioNormal').onclick = () => {
+      isPriority = false;
+      prioLabel.textContent = 'Normal';
+      hide(prioritySection);
+      show(confirm);
+    };
+    document.getElementById('prioPriority').onclick = () => {
+      isPriority = true;
+      prioLabel.textContent = 'Prioritario';
+      hide(prioritySection);
+      show(confirm);
+    };
+
     confirmBtn.onclick = async () => {
       try{
-        const payload = { queueId: 'default', meta: { service: selected, source: 'totem' } };
+        const payload = {
+          queueId: selectedQueue,
+          meta: { service: selected, source: 'totem', priority: isPriority }
+        };
         const resp = await fetch(`${API_BASE}/tickets`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         if(!resp.ok) throw new Error('Falha ao emitir ticket');
         const ticket = await resp.json();
@@ -584,7 +620,7 @@
         ticketSvc.textContent = selected;
 
         try{
-          const s = await fetch(`${API_BASE}/queues/default/stats`);
+          const s = await fetch(`${API_BASE}/queues/${selectedQueue}/stats`);
           if(s.ok){
             const stats = await s.json();
             ticketPos.textContent = stats.waiting || 0;
@@ -594,7 +630,6 @@
 
         hide(confirm);
         show(ticketSection);
-        // Imprime automaticamente via USB
         setTimeout(() => printTicket(), 300);
       }catch(e){
         showErrorToast('Erro: ' + e.message);

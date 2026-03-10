@@ -196,7 +196,11 @@ async function listTickets(filter = {}) {
   if (filter.status) { params.push(filter.status); clauses.push(`status = $${params.length}`); }
   let sql = 'SELECT * FROM tickets';
   if (clauses.length) sql += ' WHERE ' + clauses.join(' AND ');
-  sql += ' ORDER BY number ASC';
+  if (filter.status === 'waiting') {
+    sql += " ORDER BY CASE WHEN (meta->>'priority')::boolean = true THEN 0 ELSE 1 END NULLS LAST, number ASC";
+  } else {
+    sql += ' ORDER BY number ASC';
+  }
   const r = await pool.query(sql, params);
   return r.rows.map(_rowToTicket);
 }

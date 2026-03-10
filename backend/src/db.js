@@ -307,7 +307,11 @@ function listTickets(filter = {}) {
     clauses.push('status = ?'); params.push(filter.status);
   }
   if (clauses.length) sql += ' WHERE ' + clauses.join(' AND ');
-  sql += ' ORDER BY number ASC';
+  if (filter.status === 'waiting') {
+    sql += " ORDER BY CASE WHEN json_extract(meta, '$.priority') = 1 THEN 0 ELSE 1 END, number ASC";
+  } else {
+    sql += ' ORDER BY number ASC';
+  }
   const rows = db.prepare(sql).all(...params);
   return rows.map(_rowToTicket);
 }

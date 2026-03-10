@@ -16,8 +16,16 @@ Sistema integrado de gestao de filas e atendimento para servicos publicos e gran
 └─────────────┘       └──────┬───────────┘       └──────────────┘
                              │ WebSocket
 ┌─────────────┐              │
-│  Guiche      │◀────────────┘
-│  (HTML)      │
+│  Guiche      │◀────────────┤
+│  (HTML)      │             │
+└─────────────┘              │
+┌─────────────┐              │
+│  Painel TV   │◀────────────┤
+│  (HTML)      │             │
+└─────────────┘              │
+┌─────────────┐              │
+│  CSAT        │─────────────┘
+│  (HTML)      │  HTTP
 └─────────────┘
 ```
 
@@ -32,22 +40,40 @@ Sistema integrado de gestao de filas e atendimento para servicos publicos e gran
 
 ### Jornada do Cidadao (Totem)
 - Emissao de senha com selecao de servico (Cobranca, Documentos, Atendimento Geral, Suporte Tecnico)
-- Tela de confirmacao com tempo estimado de espera
-- Comprovante visual com codigo da senha, servico e posicao na fila
-- Impressao automatica do ticket via `window.print()` com layout otimizado
-- Botao de reimpressao disponivel na tela do ticket
+- Filas separadas por servico — cada servico tem sua propria fila
+- Atendimento prioritario (Idoso, PCD, Gestante) com ordenacao automatica
+- Tela de confirmacao com tipo de atendimento e tempo estimado
+- Impressao automatica via WebUSB ESC/POS para impressoras termicas
+- Pareamento USB unico com auto-reconexao
 
 ### Operacao do Atendente (Guiche)
-- Chamar proximo da fila ou senha especifica
+- Chamar proximo de TODAS as filas — prioridade primeiro, depois ordem de chegada
 - Iniciar / Finalizar atendimento com controle de tempo real
-- Transferencia de ticket entre filas via modal (sem prompt nativo)
-- Marcacao de no-show com motivo
+- Transferencia de ticket entre filas via modal com chamada a API
+- Marcacao de no-show com registro no backend
 - Historico de senhas atendidas com recall (clicar para rechamar)
 - Contador de tempo de espera em tempo real
+- Badge de prioridade no ticket em atendimento
 - Atualizacoes via WebSocket — sem polling
 
+### Painel de Chamada (TV)
+- Tela fullscreen para monitor/TV na sala de espera
+- Mostra as ultimas 5 senhas chamadas com guiche
+- Destaque visual na chamada mais recente
+- Aviso sonoro automatico (Web Audio API) a cada nova chamada
+- Contagem de aguardando por servico em tempo real
+- Atualizado via WebSocket — sem refresh
+
+### Avaliacao de Satisfacao (CSAT)
+- Formulario pos-atendimento com escala 1-5
+- Labels: Pessimo, Ruim, Regular, Bom, Otimo
+- Campo de comentario opcional
+- Opcao de pular a avaliacao
+- Redirect automatico para o totem apos envio
+- Acessado via `csat.html?ticketId=xxx`
+
 ### Metricas e Qualidade
-- Estatisticas por fila: total, aguardando, em atendimento, finalizados
+- Estatisticas por fila e agregadas (todas as filas)
 - Tempo Medio de Espera (TME) calculado automaticamente
 - CSAT por ticket com escala 1-5 e comentarios
 - NPS calculado por servico (minimo 10 respostas)
@@ -85,6 +111,8 @@ docker compose up --build -d
 |---|---|
 | Totem (cidadao) | http://localhost:8080/totem.html |
 | Guiche (atendente) | http://localhost:8080/guiche.html |
+| Painel TV (sala de espera) | http://localhost:8080/painel.html |
+| CSAT (avaliacao) | http://localhost:8080/csat.html?ticketId=xxx |
 | API Backend | http://localhost:3000 |
 | PostgreSQL | localhost:5432 |
 
@@ -134,6 +162,7 @@ npx serve prototypes -l 8080
 
 | Metodo | Rota | Descricao |
 |---|---|---|
+| `GET` | `/queues/all/stats` | Stats agregados de todas as filas (`{ waiting, called, attending }`) |
 | `GET` | `/queues/:id/stats` | Estatisticas da fila (contagem, TME) |
 
 ### CSAT / NPS
@@ -186,6 +215,8 @@ gestao-de-filas/
 ├── prototypes/
 │   ├── totem.html           # Interface do cidadao (totem touch)
 │   ├── guiche.html          # Interface do atendente
+│   ├── painel.html          # Painel de chamada (TV sala de espera)
+│   ├── csat.html            # Formulario de avaliacao pos-atendimento
 │   ├── style.css            # Estilos compartilhados
 │   └── nginx.conf           # Config Nginx para servir prototipos
 ├── docs/                    # User Stories, UX flows, Sprint Plan

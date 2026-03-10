@@ -389,10 +389,10 @@
       <h3>Transferir Ticket</h3>
       <select id="transferDest">
         <option value="">Selecione a fila destino...</option>
-        <option value="Cobrança">Cobrança</option>
-        <option value="Documentos">Documentos</option>
-        <option value="Atendimento Geral">Atendimento Geral</option>
-        <option value="Suporte Técnico">Suporte Técnico</option>
+        <option value="cobranca">Cobranca</option>
+        <option value="documentos">Documentos</option>
+        <option value="atendimento-geral">Atendimento Geral</option>
+        <option value="suporte-tecnico">Suporte Tecnico</option>
       </select>
       <div class="row">
         <button id="transferCancel" class="small">Cancelar</button>
@@ -483,7 +483,9 @@
         currentTicket = t;
         codeEl.textContent = t.number || t.id;
         svcEl.textContent = t.meta && t.meta.service ? t.meta.service : '—';
-        prioEl.textContent = 'Normal';
+        prioEl.textContent = t.meta && t.meta.priority ? 'Prioritario' : 'Normal';
+        if(t.meta && t.meta.priority) prioEl.style.color = '#f59e0b';
+        else prioEl.style.color = '';
         startTimeCounter();
 
         historyItems.splice(idx, 1);
@@ -528,39 +530,49 @@
 
     async function fetchStats(){
       try{
-        const r = await fetch(`${API_BASE}/queues/default/stats`);
+        const r = await fetch(`${API_BASE}/queues/all/stats`);
         if(!r.ok) return;
         const s = await r.json();
         totalEl.textContent = s.waiting || 0;
-        estEl.textContent = s.tme_seconds? '~' + Math.round(s.tme_seconds/60) + ' min' : '~N/A';
+        // Conta prioritarios
+        try{
+          const lr = await fetch(`${API_BASE}/tickets?status=waiting`);
+          if(lr.ok){
+            const list = await lr.json();
+            const prioTotal = list.filter(t => t.meta && t.meta.priority).length;
+            prioCountEl.textContent = prioTotal;
+          }
+        }catch(e){}
       }catch(e){console.warn(e)}
     }
 
     callBtn.onclick = async () => {
       try{
-        // fetch waiting tickets
-        const listResp = await fetch(`${API_BASE}/tickets?queueId=default&status=waiting`);
+        // fetch waiting tickets from ALL queues (priority first)
+        const listResp = await fetch(`${API_BASE}/tickets?status=waiting`);
         if(!listResp.ok) throw new Error('Falha ao buscar fila');
         const list = await listResp.json();
-        
-        if(!list.length){ 
-          showToast('Nenhum ticket aguardando na fila', 'warning'); 
-          return; 
+
+        if(!list.length){
+          showToast('Nenhum ticket aguardando na fila', 'warning');
+          return;
         }
-        
-        const next = list[0];
+
+        const next = list[0]; // backend ja ordena prioridade primeiro
         const callResp = await fetch(`${API_BASE}/tickets/${next.id}/call`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ guiche: '3' }) });
         if(!callResp.ok) throw new Error('Falha ao chamar ticket');
-        
+
         const t = await callResp.json();
         currentTicket = t;
         codeEl.textContent = t.number || t.id;
         svcEl.textContent = t.meta && t.meta.service ? t.meta.service : '—';
-        prioEl.textContent = 'Normal';
+        prioEl.textContent = t.meta && t.meta.priority ? 'Prioritario' : 'Normal';
+        if(t.meta && t.meta.priority) prioEl.style.color = '#f59e0b';
+        else prioEl.style.color = '';
         startTimeCounter();
         fetchStats();
-      }catch(e){ 
-        showToast('Erro: ' + e.message, 'error'); 
+      }catch(e){
+        showToast('Erro: ' + e.message, 'error');
       }
     }
 
@@ -579,7 +591,7 @@
         currentTicket = null;
         codeEl.textContent = '—';
         svcEl.textContent='—';
-        prioEl.textContent='Normal';
+        prioEl.textContent='Normal'; prioEl.style.color='';
         stopTimeCounter();
         fetchStats();
       }catch(e){ 
@@ -595,16 +607,21 @@
       showToast('Reconvocando painel: ' + (currentTicket.number || currentTicket.id), 'info'); 
     }
     
-    noshowBtn.onclick = () => { 
-      if(!currentTicket){ 
-        showToast('Nenhum ticket ativo', 'warning'); 
-        return; 
-      } 
-      showToast('Registrado não comparecimento para ' + (currentTicket.number || currentTicket.id), 'error');
-      addToHistory(currentTicket, 'noshow');
-      currentTicket = null;
-      codeEl.textContent = '—'; svcEl.textContent='—'; prioEl.textContent='Normal';
-      stopTimeCounter(); 
+    noshowBtn.onclick = async () => {
+      if(!currentTicket){
+        showToast('Nenhum ticket ativo', 'warning');
+        return;
+      }
+      try{
+        const r = await fetch(`${API_BASE}/tickets/${currentTicket.id}/noshow`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ reason: 'Nao compareceu' }) });
+        if(!r.ok) throw new Error('Falha ao registrar no-show');
+        showToast('Registrado nao comparecimento para ' + (currentTicket.number || currentTicket.id), 'error');
+        addToHistory(currentTicket, 'noshow');
+        currentTicket = null;
+        codeEl.textContent = '—'; svcEl.textContent='—'; prioEl.textContent='Normal'; prioEl.style.color='';
+        stopTimeCounter();
+        fetchStats();
+      }catch(e){ showToast('Erro: ' + e.message, 'error'); }
     }
     
     const transferModal = document.getElementById('transferModal');
@@ -629,19 +646,26 @@
       if(e.target === transferModal) transferModal.classList.remove('open');
     }
 
-    transferConfirm.onclick = () => {
+    transferConfirm.onclick = async () => {
       const dest = transferDest.value;
       if(!dest){
         showToast('Selecione uma fila destino', 'warning');
         return;
       }
-      transferModal.classList.remove('open');
-      showToast('Ticket ' + (currentTicket.number || currentTicket.id) + ' transferido para ' + dest, 'success');
-      addToHistory(currentTicket, 'transferred');
-      currentTicket = null;
-      codeEl.textContent = '—'; svcEl.textContent='—'; prioEl.textContent='Normal';
-      stopTimeCounter();
-      fetchStats();
+      try{
+        const r = await fetch(`${API_BASE}/tickets/${currentTicket.id}/transfer`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ toQueueId: dest, reason: 'Transferido pelo guiche' }) });
+        if(!r.ok) throw new Error('Falha ao transferir');
+        transferModal.classList.remove('open');
+        showToast('Ticket ' + (currentTicket.number || currentTicket.id) + ' transferido para ' + dest, 'success');
+        addToHistory(currentTicket, 'transferred');
+        currentTicket = null;
+        codeEl.textContent = '—'; svcEl.textContent='—'; prioEl.textContent='Normal'; prioEl.style.color='';
+        stopTimeCounter();
+        fetchStats();
+      }catch(e){
+        transferModal.classList.remove('open');
+        showToast('Erro: ' + e.message, 'error');
+      }
     }
 
     // keyboard shortcuts

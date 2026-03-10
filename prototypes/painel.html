@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Painel de Chamadas</title>
+  <style>
+    :root {
+      --primary-color: #0056b3;
+      --primary-active: #003370;
+      --accent-orange: #f59e0b;
+      --bg-color: #f4f7f6;
+      --card-bg: #ffffff;
+      --text-main: #2d3748;
+      --text-muted: #718096;
+      --border-color: #e2e8f0;
+      --success: #10b981;
+      --danger: #e53e3e;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+
+    html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg-color); color: var(--text-main); }
+    body { display: flex; flex-direction: column; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes flash {
+      0%, 100% { opacity: 1; } 25%, 75% { opacity: 0.2; }
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 4px 20px rgba(0,86,179,0.15); }
+      50% { box-shadow: 0 4px 30px rgba(0,86,179,0.35); }
+    }
+
+    .topbar {
+      background: var(--primary-color);
+      color: white;
+      padding: 1rem 2.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      z-index: 10;
+    }
+    .brand { font-size: 1.5rem; font-weight: 700; letter-spacing: 1px; }
+    .topbar-right { display: flex; align-items: center; gap: 2rem; }
+    .ws-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--danger); }
+    .ws-dot.ok { background: #4ade80; }
+    .clock { font-size: 1.8rem; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 2px; }
+
+    .main { flex: 1; display: grid; grid-template-columns: 70fr 30fr; overflow: hidden; }
+
+    /* Coluna esquerda — chamadas */
+    .left { display: flex; flex-direction: column; gap: 1rem; padding: 1.5rem 2rem; overflow: hidden; }
+    .section-title { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--text-muted); margin-bottom: 0.5rem; }
+    .calls { display: flex; flex-direction: column; gap: 0.75rem; flex: 1; overflow: hidden; }
+
+    .call-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      padding: 1rem 1.5rem;
+      flex: 1;
+      min-height: 0;
+      animation: slideIn 0.4s ease forwards;
+      border-left: 5px solid var(--primary-color);
+    }
+    .call-card.latest {
+      border-left-width: 6px;
+      animation: slideIn 0.4s ease forwards, pulse 2s ease-in-out 0.4s 3;
+      flex: 2.5;
+      background: #f0f7ff;
+    }
+    .call-card.old-2 { opacity: 0.85; }
+    .call-card.old-3 { opacity: 0.65; }
+    .call-card.old-4 { opacity: 0.45; }
+    .call-card.old-5 { opacity: 0.30; }
+
+    .ticket-num {
+      font-family: 'Courier New', monospace;
+      font-weight: 800;
+      color: var(--primary-color);
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .call-card.latest .ticket-num { font-size: clamp(4rem, 6vw, 7rem); }
+    .call-card:not(.latest) .ticket-num { font-size: clamp(2.5rem, 4vw, 4.5rem); }
+    .call-card.latest .ticket-num.flashing { animation: flash 0.8s ease 2; }
+
+    .card-info { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
+    .card-svc { font-size: clamp(1rem, 1.6vw, 1.4rem); font-weight: 600; color: var(--text-main); }
+    .call-card.latest .card-svc { font-size: clamp(1.2rem, 2vw, 1.7rem); }
+    .card-guiche { font-size: clamp(0.85rem, 1.2vw, 1.1rem); color: var(--text-muted); }
+
+    .badge-prio {
+      background: #fffbeb;
+      color: #92400e;
+      border: 1px solid var(--accent-orange);
+      border-radius: 0.4rem;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 0.2rem 0.5rem;
+      flex-shrink: 0;
+    }
+    .card-time { font-size: 0.8rem; color: var(--text-muted); flex-shrink: 0; }
+
+    .empty-state { flex: 1; display: flex; justify-content: center; align-items: center; color: var(--text-muted); font-size: 1.2rem; }
+
+    /* Coluna direita — fila */
+    .right { display: flex; flex-direction: column; gap: 1rem; padding: 1.5rem; border-left: 1px solid var(--border-color); overflow: hidden; }
+    .queue-list { display: flex; flex-direction: column; gap: 0.5rem; flex: 1; overflow-y: auto; }
+    .queue-row {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 0.8rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .queue-svc { font-size: 0.95rem; font-weight: 600; color: var(--text-main); }
+    .queue-count { font-size: 1.8rem; font-weight: 800; color: var(--primary-color); font-family: 'Courier New', monospace; }
+    .queue-total {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .queue-total-label { font-size: 0.9rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+    .queue-total-value { font-size: 2.2rem; font-weight: 800; color: var(--text-main); font-family: 'Courier New', monospace; }
+
+    .footer {
+      background: var(--card-bg);
+      border-top: 1px solid var(--border-color);
+      padding: 0.5rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Painel de Chamadas</div>
+    <div class="topbar-right">
+      <div class="ws-dot" id="wsDot"></div>
+      <div class="clock" id="clock">00:00</div>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="left">
+      <div class="section-title">Ultimas Chamadas</div>
+      <div class="calls" id="callsList">
+        <div class="empty-state" id="emptyState">Aguardando chamadas...</div>
+      </div>
+    </div>
+    <div class="right">
+      <div class="section-title">Aguardando por Servico</div>
+      <div class="queue-list" id="queueList"></div>
+      <div class="queue-total">
+        <div class="queue-total-label">Total Aguardando</div>
+        <div class="queue-total-value" id="totalWaiting">0</div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div>Gestao de Filas</div>
+    <div id="dateDisplay"></div>
+  </footer>
+
+  <script>
+    const API_BASE = 'http://localhost:3000';
+    const WS_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.hostname + ':3000';
+    const MAX_CALLS = 5;
+    let calledTickets = [];
+    let ws;
+
+    // Relogio
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      document.getElementById('dateDisplay').textContent = now.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // Som
+    function playChime() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        function beep(freq, start, dur, gain) {
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.connect(g); g.connect(ctx.destination);
+          osc.type = 'sine'; osc.frequency.setValueAtTime(freq, start);
+          g.gain.setValueAtTime(0, start);
+          g.gain.linearRampToValueAtTime(gain, start + 0.02);
+          g.gain.linearRampToValueAtTime(0, start + dur);
+          osc.start(start); osc.stop(start + dur);
+        }
+        const t = ctx.currentTime;
+        beep(880, t, 0.18, 0.35);
+        beep(1100, t + 0.22, 0.25, 0.28);
+        beep(880, t + 0.52, 0.15, 0.18);
+        setTimeout(() => ctx.close(), 1200);
+      } catch(e) {}
+    }
+
+    // Render chamadas
+    const callsList = document.getElementById('callsList');
+    const emptyState = document.getElementById('emptyState');
+
+    function renderCalls(flash) {
+      callsList.innerHTML = '';
+      if (!calledTickets.length) { callsList.appendChild(emptyState); return; }
+
+      calledTickets.forEach((t, i) => {
+        const isPrio = t.meta && t.meta.priority;
+        const svc = (t.meta && t.meta.service) || 'Atendimento Geral';
+        const guiche = t.guiche || '-';
+        const time = t.calledAt ? new Date(t.calledAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+        const code = String(t.number || t.id).padStart(4, '0');
+
+        const cls = i === 0 ? 'latest' : 'old-' + Math.min(i + 1, 5);
+        const card = document.createElement('div');
+        card.className = 'call-card ' + cls;
+
+        let html = `<div class="ticket-num${i === 0 && flash ? ' flashing' : ''}">${code}</div>`;
+        html += `<div class="card-info"><div class="card-svc">${svc}</div><div class="card-guiche">Guiche ${guiche}</div></div>`;
+        if (isPrio) html += `<div class="badge-prio">PRIORITARIO</div>`;
+        html += `<div class="card-time">${time}</div>`;
+        card.innerHTML = html;
+        callsList.appendChild(card);
+      });
+    }
+
+    // Render fila
+    const queueList = document.getElementById('queueList');
+    const totalWaiting = document.getElementById('totalWaiting');
+
+    function renderQueue(map) {
+      const entries = Object.entries(map).sort(([,a],[,b]) => b - a);
+      totalWaiting.textContent = entries.reduce((s,[,v]) => s + v, 0);
+      queueList.innerHTML = '';
+      if (!entries.length) { queueList.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">Fila vazia</div>'; return; }
+      entries.forEach(([svc, count]) => {
+        const row = document.createElement('div');
+        row.className = 'queue-row';
+        row.innerHTML = `<div class="queue-svc">${svc}</div><div class="queue-count">${count}</div>`;
+        queueList.appendChild(row);
+      });
+    }
+
+    // Adicionar chamada
+    function addCalledTicket(ticket, sound = true) {
+      if (calledTickets.some(t => t.id === ticket.id)) return;
+      calledTickets.unshift(ticket);
+      if (calledTickets.length > MAX_CALLS) calledTickets = calledTickets.slice(0, MAX_CALLS);
+      renderCalls(true);
+      if (sound) playChime();
+      fetchQueueInfo();
+    }
+
+    // WebSocket
+    const wsDot = document.getElementById('wsDot');
+    function initWS() {
+      try {
+        ws = new WebSocket(WS_URL);
+        ws.onopen = () => { wsDot.className = 'ws-dot ok'; };
+        ws.onmessage = (ev) => {
+          try {
+            const msg = JSON.parse(ev.data);
+            const event = msg.type || msg.event;
+            const payload = msg.ticket || msg.payload || msg.data || msg;
+            if (event === 'ticket.called') addCalledTicket(payload.ticket || payload);
+            if (['ticket.created','ticket.called','ticket.finalized','ticket.noshow'].includes(event)) fetchQueueInfo();
+          } catch(e) {}
+        };
+        ws.onclose = () => { wsDot.className = 'ws-dot'; setTimeout(initWS, 5000); };
+      } catch(e) { setTimeout(initWS, 5000); }
+    }
+
+    // Fetch inicial
+    async function fetchCalledTickets() {
+      try {
+        const r = await fetch(`${API_BASE}/tickets?status=called`);
+        if (!r.ok) return;
+        const list = await r.json();
+        calledTickets = [...list].sort((a,b) => new Date(b.calledAt||0) - new Date(a.calledAt||0)).slice(0, MAX_CALLS);
+        renderCalls(false);
+      } catch(e) {}
+    }
+
+    async function fetchQueueInfo() {
+      try {
+        const r = await fetch(`${API_BASE}/tickets?status=waiting`);
+        if (!r.ok) return;
+        const list = await r.json();
+        const map = {};
+        list.forEach(t => {
+          const svc = (t.meta && t.meta.service) || 'Atendimento Geral';
+          map[svc] = (map[svc] || 0) + 1;
+        });
+        renderQueue(map);
+      } catch(e) {}
+    }
+
+    // Init
+    (async () => {
+      renderCalls(false);
+      renderQueue({});
+      await Promise.allSettled([fetchCalledTickets(), fetchQueueInfo()]);
+      initWS();
+      setInterval(fetchQueueInfo, 30000);
+    })();
+  </script>
+</body>
+</html>

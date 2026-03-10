@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Avaliação de Atendimento</title>
+  <style>
+    /* Reset e Variáveis */
+    :root {
+      --primary-color: #0056b3;
+      --primary-hover: #004494;
+      --primary-active: #003370;
+      --bg-color: #f4f7f6;
+      --text-main: #2d3748;
+      --text-muted: #718096;
+      --card-bg: #ffffff;
+      --danger: #e53e3e;
+      --success: #276749;
+      --success-bg: #f0fff4;
+      --border-muted: #e2e8f0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Animações */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-50px) translateX(-50%); }
+      to   { opacity: 1; transform: translateY(0)    translateX(-50%); }
+    }
+
+    /* Cabeçalho */
+    .topbar {
+      background: var(--primary-color);
+      color: white;
+      padding: 1.5rem 2.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      z-index: 10;
+    }
+
+    .brand {
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    /* Container Principal */
+    .center {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem;
+      position: relative;
+    }
+
+    /* Seções (Cartões) */
+    section {
+      background: var(--card-bg);
+      padding: 3.5rem;
+      border-radius: 1.5rem;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+      width: 100%;
+      max-width: 850px;
+      text-align: center;
+      animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    section.hidden {
+      display: none !important;
+    }
+
+    h1 {
+      font-size: 3rem;
+      margin-bottom: 0.75rem;
+      color: var(--primary-color);
+    }
+
+    h2 {
+      font-size: 2.2rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-main);
+    }
+
+    p.subtitle {
+      font-size: 1.3rem;
+      color: var(--text-muted);
+      margin-bottom: 2.5rem;
+    }
+
+    /* Botões Gerais */
+    button {
+      outline: none;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      touch-action: manipulation;
+    }
+
+    /* Botão Primário */
+    .primary {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 1.5rem 3rem;
+      font-size: 1.5rem;
+      border-radius: 1rem;
+      box-shadow: 0 8px 0 var(--primary-active), 0 15px 20px rgba(0,0,0,0.2);
+    }
+
+    .primary:active {
+      transform: translateY(8px);
+      box-shadow: 0 0px 0 var(--primary-active), 0 5px 10px rgba(0,0,0,0.2);
+    }
+
+    /* Botão Secundário */
+    .secondary {
+      background: transparent;
+      color: var(--primary-color);
+      border: 2px solid var(--primary-color);
+      padding: 1.5rem 3rem;
+      font-size: 1.5rem;
+      border-radius: 1rem;
+      box-shadow: 0 4px 0 rgba(0, 86, 179, 0.2);
+    }
+
+    .secondary:active {
+      transform: translateY(4px);
+      box-shadow: 0 0px 0 rgba(0, 86, 179, 0.2);
+    }
+
+    /* Linha de botões */
+    .row {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      margin-top: 2.5rem;
+      flex-wrap: wrap;
+    }
+
+    /* Grade de estrelas (ratings) */
+    .stars-grid {
+      display: flex;
+      justify-content: center;
+      gap: 1.25rem;
+      margin-bottom: 2.5rem;
+      flex-wrap: wrap;
+    }
+
+    .star-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.6rem;
+      background: #f8fafc;
+      color: var(--text-main);
+      border: 2.5px solid var(--border-muted);
+      padding: 1.75rem 0;
+      width: 120px;
+      border-radius: 1rem;
+      box-shadow: 0 6px 0 #cbd5e1;
+      font-size: 1rem;
+      font-weight: 600;
+      transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s, box-shadow 0.1s;
+    }
+
+    .star-btn .number {
+      font-size: 2.2rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .star-btn .label {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      transition: color 0.15s;
+    }
+
+    .star-btn:active {
+      transform: translateY(6px);
+      box-shadow: 0 0px 0 #cbd5e1;
+    }
+
+    .star-btn.selected {
+      background: var(--primary-color);
+      color: white;
+      border-color: var(--primary-color);
+      box-shadow: 0 6px 0 var(--primary-active);
+    }
+
+    .star-btn.selected .label {
+      color: rgba(255,255,255,0.85);
+    }
+
+    .star-btn.selected:active {
+      box-shadow: 0 0px 0 var(--primary-active);
+    }
+
+    /* Textarea do comentário */
+    .comment-wrap {
+      margin-bottom: 0.5rem;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 1.25rem 1.5rem;
+      font-size: 1.25rem;
+      font-family: inherit;
+      color: var(--text-main);
+      background: #f8fafc;
+      border: 2px solid var(--border-muted);
+      border-radius: 0.875rem;
+      resize: none;
+      outline: none;
+      user-select: text;
+      transition: border-color 0.2s;
+      touch-action: manipulation;
+    }
+
+    textarea:focus {
+      border-color: var(--primary-color);
+      background: white;
+    }
+
+    textarea::placeholder {
+      color: var(--text-muted);
+    }
+
+    /* Tela de confirmação */
+    #thanks h1 {
+      font-size: 3.5rem;
+    }
+
+    #thanks p.subtitle {
+      font-size: 1.4rem;
+      margin-bottom: 0;
+    }
+
+    .redirect-note {
+      margin-top: 1.5rem;
+      font-size: 1.1rem;
+      color: var(--text-muted);
+    }
+
+    /* Toast de Erro */
+    .error-toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--danger);
+      color: white;
+      padding: 1rem 2rem;
+      border-radius: 0.5rem;
+      font-size: 1.2rem;
+      font-weight: bold;
+      box-shadow: 0 4px 12px rgba(229, 62, 62, 0.4);
+      z-index: 9999;
+      animation: slideDown 0.3s ease-out forwards;
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Gestão de Filas — Avaliação</div>
+  </header>
+
+  <main class="center">
+
+    <!-- Tela de avaliação -->
+    <section id="csat">
+      <h2>Como foi seu atendimento?</h2>
+      <p class="subtitle">Selecione uma nota abaixo</p>
+
+      <div class="stars-grid" id="starsGrid">
+        <button class="star-btn" data-rating="1">
+          <span class="number">1</span>
+          <span class="label">Pessimo</span>
+        </button>
+        <button class="star-btn" data-rating="2">
+          <span class="number">2</span>
+          <span class="label">Ruim</span>
+        </button>
+        <button class="star-btn" data-rating="3">
+          <span class="number">3</span>
+          <span class="label">Regular</span>
+        </button>
+        <button class="star-btn" data-rating="4">
+          <span class="number">4</span>
+          <span class="label">Bom</span>
+        </button>
+        <button class="star-btn" data-rating="5">
+          <span class="number">5</span>
+          <span class="label">Otimo</span>
+        </button>
+      </div>
+
+      <div class="comment-wrap">
+        <textarea id="commentInput" placeholder="Deixe um comentario (opcional)"></textarea>
+      </div>
+
+      <div class="row">
+        <button class="secondary" id="skipBtn">Pular</button>
+        <button class="primary" id="submitBtn">Enviar</button>
+      </div>
+    </section>
+
+    <!-- Tela de agradecimento -->
+    <section id="thanks" class="hidden">
+      <h1>Obrigado!</h1>
+      <p class="subtitle">Sua avaliacao foi registrada.<br>Agradecemos o seu retorno.</p>
+      <p class="redirect-note">Redirecionando em <span id="countdown">3</span> segundos...</p>
+    </section>
+
+  </main>
+
+  <script>
+    const API_BASE = 'http://localhost:3000';
+
+    // Lê o ticketId da URL
+    const params = new URLSearchParams(location.search);
+    const ticketId = params.get('ticketId');
+
+    let selectedRating = null;
+
+    // ==================== Toast de Erro ====================
+    function showErrorToast(message) {
+      const toast = document.createElement('div');
+      toast.className = 'error-toast';
+      toast.innerText = message;
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    // ==================== Seleção de Nota ====================
+    document.querySelectorAll('.star-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedRating = parseInt(btn.dataset.rating, 10);
+        document.querySelectorAll('.star-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    });
+
+    // ==================== Redirecionamento ====================
+    function redirectToTotem() {
+      let count = 3;
+      const countdownEl = document.getElementById('countdown');
+      const interval = setInterval(() => {
+        count--;
+        countdownEl.textContent = count;
+        if (count <= 0) {
+          clearInterval(interval);
+          location.href = 'totem.html';
+        }
+      }, 1000);
+    }
+
+    function showThanks() {
+      document.getElementById('csat').classList.add('hidden');
+      document.getElementById('thanks').classList.remove('hidden');
+      redirectToTotem();
+    }
+
+    // ==================== Envio da Avaliação ====================
+    async function submitCsat(payload) {
+      if (!ticketId) {
+        showErrorToast('ID do ticket nao encontrado na URL.');
+        return;
+      }
+      try {
+        const resp = await fetch(`${API_BASE}/tickets/${ticketId}/csat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!resp.ok) {
+          const err = await resp.text().catch(() => 'Erro desconhecido');
+          throw new Error(err || `Status ${resp.status}`);
+        }
+        showThanks();
+      } catch (e) {
+        showErrorToast('Falha ao enviar avaliacao: ' + e.message);
+      }
+    }
+
+    // Botão Enviar
+    document.getElementById('submitBtn').addEventListener('click', () => {
+      if (!selectedRating) {
+        showErrorToast('Selecione uma nota antes de enviar.');
+        return;
+      }
+      const comment = document.getElementById('commentInput').value.trim();
+      submitCsat({ rating: selectedRating, comment, skipped: false });
+    });
+
+    // Botão Pular
+    document.getElementById('skipBtn').addEventListener('click', () => {
+      submitCsat({ skipped: true });
+    });
+  </script>
+</body>
+</html>
