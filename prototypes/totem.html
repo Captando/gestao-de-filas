@@ -259,30 +259,20 @@
     #serviceSummary { font-size: 1.8rem; color: var(--text-main); margin-bottom: 0.5rem; }
     #serviceSummary strong { color: var(--primary-color); }
 
-    /* ===== Impressão ===== */
-    @media print {
-      /* Esconde tudo menos o ticket */
-      body { background: white; height: auto; overflow: visible; }
-      .topbar, .error-toast { display: none !important; }
-      .center { padding: 0; display: block; }
-
-      section { display: none !important; }
-      section#ticket { display: block !important; animation: none; box-shadow: none; padding: 0; border-radius: 0; max-width: 100%; }
-      section#ticket h2 { font-size: 1.4rem; margin-bottom: 0.5rem; }
-      section#ticket > p { font-size: 1rem; margin-bottom: 1rem; }
-      section#ticket .row { display: none !important; }
-
-      .ticket { border: 2px dashed #333; box-shadow: none; margin: 0 auto; padding: 1.5rem 1rem; max-width: 300px; }
-      .ticket::before, .ticket::after { display: none; }
-      .code { font-size: 3rem; color: #000; }
-      .meta { font-size: 1rem; color: #000; }
-      .meta span { color: #000; }
+    /* Indicador de impressora */
+    .printer-status {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      padding: 0.5rem 1rem;
     }
+    .printer-status.connected { color: #38a169; }
+    .printer-status.disconnected { color: var(--danger); }
   </style>
 </head>
 <body>
   <header class="topbar">
     <div class="brand">Gestão de Filas — Totem</div>
+    <div id="printerStatus" class="printer-status disconnected">Impressora: desconectada</div>
   </header>
 
   <main class="center">
@@ -291,6 +281,9 @@
       <h1>Bem-vindo</h1>
       <p>Toque no botão abaixo para iniciar o fluxo de emissão de senha.</p>
       <button id="startBtn" class="primary large">Emitir Senha</button>
+      <div class="row">
+        <button id="pairPrinterBtn" class="small">Parear Impressora USB</button>
+      </div>
     </section>
 
     <!-- Tela de Categorias -->
@@ -343,15 +336,197 @@
       try{
         ws = new WebSocket(WS_URL);
         ws.onopen = ()=>console.log('WS connected');
-        ws.onmessage = ev => {
-          // currently we don't need live updates here, but keep for future
-          // const msg = JSON.parse(ev.data);
-        };
+        ws.onmessage = ev => {};
         ws.onclose = ()=>console.log('WS closed');
       }catch(e){console.warn('WS init failed', e)}
     }
     initWS();
 
+    // ==================== WebUSB ESC/POS Printer ====================
+    let usbDevice = null;
+    let usbEndpoint = null;
+    const printerStatusEl = document.getElementById('printerStatus');
+
+    function setPrinterStatus(connected) {
+      if (connected) {
+        printerStatusEl.textContent = 'Impressora: conectada';
+        printerStatusEl.className = 'printer-status connected';
+      } else {
+        printerStatusEl.textContent = 'Impressora: desconectada';
+        printerStatusEl.className = 'printer-status disconnected';
+      }
+    }
+
+    // Tenta reconectar com impressora ja pareada anteriormente
+    async function autoReconnectPrinter() {
+      if (!navigator.usb) return;
+      try {
+        const devices = await navigator.usb.getDevices();
+        if (devices.length > 0) {
+          await connectPrinter(devices[0]);
+        }
+      } catch(e) { console.warn('Auto-reconnect falhou', e); }
+    }
+
+    async function connectPrinter(device) {
+      try {
+        await device.open();
+        // Seleciona a primeira configuracao disponivel
+        if (device.configuration === null) {
+          await device.selectConfiguration(1);
+        }
+        // Procura interface de impressora (classe 7) ou pega a primeira disponivel
+        const iface = device.configuration.interfaces.find(i =>
+          i.alternate.interfaceClass === 7
+        ) || device.configuration.interfaces[0];
+
+        await device.claimInterface(iface.interfaceNumber);
+
+        // Procura endpoint OUT (bulk transfer)
+        const ep = iface.alternate.endpoints.find(e => e.direction === 'out' && e.type === 'bulk');
+        if (!ep) throw new Error('Endpoint OUT nao encontrado');
+
+        usbDevice = device;
+        usbEndpoint = ep.endpointNumber;
+        setPrinterStatus(true);
+        console.log('Impressora conectada:', device.productName, 'endpoint:', usbEndpoint);
+      } catch(e) {
+        console.error('Erro ao conectar impressora:', e);
+        usbDevice = null;
+        usbEndpoint = null;
+        setPrinterStatus(false);
+        showErrorToast('Falha ao conectar impressora: ' + e.message);
+      }
+    }
+
+    async function pairPrinter() {
+      if (!navigator.usb) {
+        showErrorToast('WebUSB nao suportado neste navegador. Use Chrome/Edge.');
+        return;
+      }
+      try {
+        const device = await navigator.usb.requestDevice({ filters: [] });
+        await connectPrinter(device);
+      } catch(e) {
+        if (e.name !== 'NotFoundError') { // usuario cancelou
+          showErrorToast('Erro ao parear: ' + e.message);
+        }
+      }
+    }
+
+    // Detecta desconexao
+    if (navigator.usb) {
+      navigator.usb.addEventListener('disconnect', (ev) => {
+        if (usbDevice && ev.device === usbDevice) {
+          usbDevice = null;
+          usbEndpoint = null;
+          setPrinterStatus(false);
+        }
+      });
+    }
+
+    // Encoder de texto para bytes
+    const encoder = new TextEncoder();
+
+    // Monta os bytes ESC/POS do ticket
+    function buildTicketBytes(code, service, position, estimate) {
+      const ESC = 0x1B;
+      const GS = 0x1D;
+      const LF = 0x0A;
+
+      const parts = [];
+
+      // Reset impressora
+      parts.push(new Uint8Array([ESC, 0x40]));
+
+      // Centralizar
+      parts.push(new Uint8Array([ESC, 0x61, 0x01]));
+
+      // Titulo — negrito + tamanho duplo
+      parts.push(new Uint8Array([ESC, 0x45, 0x01])); // negrito on
+      parts.push(new Uint8Array([GS, 0x21, 0x11]));  // largura 2x + altura 2x
+      parts.push(encoder.encode('SENHA'));
+      parts.push(new Uint8Array([LF]));
+
+      // Codigo da senha — tamanho 4x
+      parts.push(new Uint8Array([GS, 0x21, 0x33])); // largura 4x + altura 4x
+      parts.push(encoder.encode(code));
+      parts.push(new Uint8Array([LF]));
+
+      // Reset tamanho
+      parts.push(new Uint8Array([GS, 0x21, 0x00]));
+      parts.push(new Uint8Array([ESC, 0x45, 0x00])); // negrito off
+
+      // Linha separadora
+      parts.push(encoder.encode('--------------------------------'));
+      parts.push(new Uint8Array([LF]));
+
+      // Alinhar a esquerda
+      parts.push(new Uint8Array([ESC, 0x61, 0x00]));
+
+      // Servico
+      parts.push(encoder.encode('Servico: ' + service));
+      parts.push(new Uint8Array([LF]));
+
+      // Posicao na fila
+      parts.push(encoder.encode('Pessoas na fila: ' + position));
+      parts.push(new Uint8Array([LF]));
+
+      // Estimativa
+      parts.push(encoder.encode('Espera estimada: ' + estimate));
+      parts.push(new Uint8Array([LF]));
+
+      // Data/hora
+      const now = new Date();
+      const dtStr = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      parts.push(encoder.encode('Emitido em: ' + dtStr));
+      parts.push(new Uint8Array([LF]));
+
+      // Centralizar de novo
+      parts.push(new Uint8Array([ESC, 0x61, 0x01]));
+      parts.push(encoder.encode('--------------------------------'));
+      parts.push(new Uint8Array([LF]));
+      parts.push(encoder.encode('Aguarde ser chamado no painel.'));
+      parts.push(new Uint8Array([LF, LF]));
+
+      // Corte parcial (avanca papel + corta)
+      parts.push(new Uint8Array([GS, 0x56, 0x41, 0x03]));
+
+      // Junta tudo num unico Uint8Array
+      const total = parts.reduce((s, p) => s + p.length, 0);
+      const result = new Uint8Array(total);
+      let offset = 0;
+      for (const p of parts) {
+        result.set(p, offset);
+        offset += p.length;
+      }
+      return result;
+    }
+
+    async function printTicket() {
+      const code = ticketCode.textContent;
+      const service = ticketSvc.textContent;
+      const position = ticketPos.textContent;
+      const estimate = ticketEst.textContent;
+
+      if (usbDevice && usbEndpoint) {
+        try {
+          const data = buildTicketBytes(code, service, position, estimate);
+          await usbDevice.transferOut(usbEndpoint, data);
+          console.log('Ticket impresso via WebUSB');
+        } catch(e) {
+          console.error('Erro ao imprimir:', e);
+          showErrorToast('Erro na impressao: ' + e.message);
+        }
+      } else {
+        showErrorToast('Impressora nao conectada. Pare a impressora primeiro.');
+      }
+    }
+
+    // Tenta reconectar automaticamente ao carregar
+    autoReconnectPrinter();
+
+    // ==================== UI ====================
     const startBtn = document.getElementById('startBtn');
     const categories = document.getElementById('categories');
     const start = document.getElementById('start');
@@ -371,7 +546,6 @@
     function show(el){ el.classList.remove('hidden'); }
     function hide(el){ el.classList.add('hidden'); }
 
-    // Função para mostrar erros sem usar o alert() nativo
     function showErrorToast(message) {
       const toast = document.createElement('div');
       toast.className = 'error-toast';
@@ -383,6 +557,9 @@
         setTimeout(() => toast.remove(), 300);
       }, 4000);
     }
+
+    // Parear impressora (precisa de gesto do usuario — click)
+    document.getElementById('pairPrinterBtn').onclick = () => pairPrinter();
 
     startBtn.onclick = () => { hide(start); show(categories); };
     backFromCat.onclick = () => { hide(categories); show(start); };
@@ -397,7 +574,6 @@
     });
 
     confirmBtn.onclick = async () => {
-      // call backend to create ticket
       try{
         const payload = { queueId: 'default', meta: { service: selected, source: 'totem' } };
         const resp = await fetch(`${API_BASE}/tickets`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -406,28 +582,27 @@
         const code = String(ticket.number || ticket.id).padStart(4, '0');
         ticketCode.textContent = code;
         ticketSvc.textContent = selected;
-        
-        // fetch queue stats for a rough position/estimate
+
         try{
           const s = await fetch(`${API_BASE}/queues/default/stats`);
-          if(s.ok){ 
-            const stats = await s.json(); 
-            ticketPos.textContent = stats.waiting || 0; 
-            ticketEst.textContent = stats.tme_seconds? '~' + Math.round(stats.tme_seconds/60) + ' min' : '~N/A'; 
+          if(s.ok){
+            const stats = await s.json();
+            ticketPos.textContent = stats.waiting || 0;
+            ticketEst.textContent = stats.tme_seconds? '~' + Math.round(stats.tme_seconds/60) + ' min' : '~N/A';
           }
         }catch(e){}
-        
+
         hide(confirm);
         show(ticketSection);
-        // Imprime o ticket automaticamente
-        setTimeout(() => window.print(), 400);
+        // Imprime automaticamente via USB
+        setTimeout(() => printTicket(), 300);
       }catch(e){
         showErrorToast('Erro: ' + e.message);
       }
     }
 
     correctBtn.onclick = () => { hide(confirm); show(categories); }
-    document.getElementById('printBtn').onclick = () => window.print();
+    document.getElementById('printBtn').onclick = () => printTicket();
     doneBtn.onclick = () => { hide(ticketSection); show(start); }
 
   </script>
